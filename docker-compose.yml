@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: securemailscope-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mailscope
+      POSTGRES_PASSWORD: securepassword2026
+      POSTGRES_DB: securemailscope_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailscope -d securemailscope_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: securemailscope-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://mailscope:securepassword2026@postgres:5432/securemailscope_db
+      MAX_UPLOAD_SIZE_MB: 100
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+
+  # 3. React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: securemailscope-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  pgdata:
